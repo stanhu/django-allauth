@@ -24,7 +24,7 @@ class SocialAppManager(models.Manager):
 class SocialApp(models.Model):
     objects = SocialAppManager()
 
-    provider = models.CharField(max_length=30, 
+    provider = models.CharField(max_length=30,
                                 choices=providers.registry.as_choices())
     name = models.CharField(max_length=40)
     client_id = models.CharField(max_length=100,
@@ -153,7 +153,7 @@ class SocialLogin(object):
             if not email:
                 continue
             # ... and non-conflicting ones...
-            if (account_settings.UNIQUE_EMAIL 
+            if (account_settings.UNIQUE_EMAIL
                 and EmailAddress.objects.filter(email__iexact=email).exists()):
                 continue
             email_address.user = user
@@ -172,7 +172,7 @@ class SocialLogin(object):
         """
         assert not self.is_existing
         try:
-            a = SocialAccount.objects.get(provider=self.account.provider, 
+            a = SocialAccount.objects.get(provider=self.account.provider,
                                           uid=self.account.uid)
             # Update account
             a.extra_data = self.account.extra_data
@@ -193,13 +193,13 @@ class SocialLogin(object):
                     self.token.save()
         except SocialAccount.DoesNotExist:
             pass
-    
+
     def get_redirect_url(self, request, fallback=True):
         if fallback and type(fallback) == bool:
             fallback = get_adapter().get_login_redirect_url(request)
         url = self.state.get('next') or fallback
         return url
-            
+
     @classmethod
     def state_from_request(cls, request):
         state = {}
@@ -212,7 +212,7 @@ class SocialLogin(object):
     def marshall_state(cls, request):
         state = cls.state_from_request(request)
         return simplejson.dumps(state)
-    
+
     @classmethod
     def unmarshall_state(cls, state_string):
         if state_string:
@@ -220,5 +220,5 @@ class SocialLogin(object):
         else:
             state = {}
         return state
-    
-            
+
+
