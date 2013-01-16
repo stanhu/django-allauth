@@ -87,15 +87,17 @@ def render_authentication_error(request, extra_context={}):
         extra_context, context_instance=RequestContext(request))
 
 def is_trusted_email(email):
-    trusted_domains = app_settings.TRUSTED_EMAIL_DOMAINS
-    # Extract the domain name from the e-mail address
-    match = re.search("@[\w.]+", email)
     is_trusted = False
+    trusted_domains = app_settings.TRUSTED_EMAIL_DOMAINS
 
-    if match:
-        domain = match.group(0)[1:]
-        if domain in trusted_domains:
-            is_trusted = True
+    if email is not None and len(trusted_domains) > 0:
+        # Extract the domain name from the e-mail address
+        match = re.search("@[\w.]+", email)
+
+        if match:
+            domain = match.group(0)[1:]
+            if domain in trusted_domains:
+                is_trusted = True
 
     return is_trusted
 
