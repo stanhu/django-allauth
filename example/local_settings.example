@@ -83,3 +83,10 @@
 
 # Dictionary containing provider specific settings.
 # SOCIALACCOUNT_PROVIDERS
+
+# List containing trusted e-mail domains.  Default is none.  When an e-mail
+# address that contains a domain in this list, the system will lookup the user
+# who has this e-mail address and associate the URL used with the existing
+# user, if present.  This is useful if you want to be able to access a service
+# from different URLs and avoid creating duplicate accounts.
+SOCIALACCOUNT_TRUSTED_EMAIL_DOMAINS = []

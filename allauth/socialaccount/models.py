@@ -168,7 +168,7 @@ class SocialLogin(object):
 
     def lookup(self):
         """
-        Lookup existing account, if any.
+        Lookup existing account, if any.  Return True if exists.
         """
         assert not self.is_existing
         try:
@@ -191,8 +191,9 @@ class SocialLogin(object):
                 except SocialToken.DoesNotExist:
                     self.token.account = a
                     self.token.save()
+            return True
         except SocialAccount.DoesNotExist:
-            pass
+            return False
 
     def get_redirect_url(self, request, fallback=True):
         if fallback and type(fallback) == bool:

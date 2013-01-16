@@ -15,6 +15,7 @@ from allauth.exceptions import ImmediateHttpResponse
 
 from models import SocialLogin
 import app_settings
+import re
 import signals
 from adapter import get_adapter
 
@@ -85,10 +86,23 @@ def render_authentication_error(request, extra_context={}):
         "socialaccount/authentication_error.html",
         extra_context, context_instance=RequestContext(request))
 
+def is_trusted_email(email):
+    trusted_domains = app_settings.TRUSTED_EMAIL_DOMAINS
+    # Extract the domain name from the e-mail address
+    match = re.search("@[\w.]+", email)
+    is_trusted = False
+
+    if match:
+        domain = match.group(0)[1:]
+        if domain in trusted_domains:
+            is_trusted = True
+
+    return is_trusted
 
 def complete_social_login(request, sociallogin):
     assert not sociallogin.is_existing
-    sociallogin.lookup()
+    login_exists = sociallogin.lookup()
+
     try:
         get_adapter().pre_social_login(request, sociallogin)
         signals.pre_social_login.send(sender=SocialLogin,
@@ -96,6 +110,19 @@ def complete_social_login(request, sociallogin):
                                       sociallogin=sociallogin)
     except ImmediateHttpResponse, e:
         return e.response
+
+    # If the social login did not exist but we trust the domain from which the
+    # e-mail address was sent, then lookup the user associated with that
+    # address and use it if exists.  This allows the system to be accessed from
+    # different URLs.
+    if not login_exists and is_trusted_email(sociallogin.account.user.email):
+        try:
+            user = User.objects.get(email=sociallogin.account.user.email)
+            sociallogin.account.user = user
+            sociallogin.save()
+        except User.DoesNotExist:
+            pass
+
     if request.user.is_authenticated():
         if sociallogin.is_existing:
             # Existing social account, existing user

@@ -52,6 +52,11 @@ class AppSettings(object):
             ('ADAPTER',
              'allauth.socialaccount.adapter.DefaultSocialAccountAdapter')
 
+    @property
+    def TRUSTED_EMAIL_DOMAINS(self):
+        return self._setting('TRUSTED_EMAIL_DOMAINS',
+                             [])
+
 # Ugly? Guido recommends this himself ...
 # http://mail.python.org/pipermail/python-ideas/2012-May/014969.html
 import sys
