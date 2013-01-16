@@ -10,11 +10,11 @@ class AppSettings(object):
     @property
     def QUERY_EMAIL(self):
         """
-        Request e-mail address from 3rd party account provider? 
+        Request e-mail address from 3rd party account provider?
         E.g. using OpenID AX
         """
         from allauth.account import app_settings as account_settings
-        return self._setting("QUERY_EMAIL", 
+        return self._setting("QUERY_EMAIL",
                              account_settings.EMAIL_REQUIRED)
 
     @property
@@ -49,7 +49,7 @@ class AppSettings(object):
     @property
     def ADAPTER(self):
         return self._setting \
-            ('ADAPTER', 
+            ('ADAPTER',
              'allauth.socialaccount.adapter.DefaultSocialAccountAdapter')
 
 # Ugly? Guido recommends this himself ...
