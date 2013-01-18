@@ -118,12 +118,22 @@ def complete_social_login(request, sociallogin):
     # address and use it if exists.  This allows the system to be accessed from
     # different URLs.
     if not login_exists and is_trusted_email(sociallogin.account.user.email):
-        try:
-            user = User.objects.get(email=sociallogin.account.user.email)
+        # Nothing in the Django user model says that e-mail addresses have to
+        # be unique.  If there are duplicate entries, use the one that has the
+        # smallest primary key.
+        users = User.objects.filter(
+            email__iexact=sociallogin.account.user.email).order_by('pk')
+
+        if len(users):
+            user = users[0]
             sociallogin.account.user = user
             sociallogin.save()
-        except User.DoesNotExist:
-            pass
+
+            if len(users) > 1:
+                import warnings
+                warnings.warn(
+                    "Duplicate e-mail accounts dedicated in Django Users model. "
+                    "Picking user name %s" % user.username)
 
     if request.user.is_authenticated():
         if sociallogin.is_existing:
