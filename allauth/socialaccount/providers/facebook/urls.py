@@ -1,9 +1,9 @@
-from django.conf.urls.defaults import patterns, url
+from django.conf.urls import patterns, url
 
 from allauth.socialaccount.providers.oauth2.urls import default_urlpatterns
 
-from provider import FacebookProvider
-import views
+from .provider import FacebookProvider
+from . import views
 
 urlpatterns = default_urlpatterns(FacebookProvider)
 

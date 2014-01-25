@@ -1,5 +1,8 @@
-import urllib
-import urlparse
+try:
+    from urllib.parse import parse_qsl, urlencode
+except ImportError:
+    from urllib import urlencode
+    from urlparse import parse_qsl
 import requests
 
 
@@ -10,12 +13,10 @@ class OAuth2Error(Exception):
 class OAuth2Client(object):
 
     def __init__(self, request, consumer_key, consumer_secret,
-                 authorization_url,
                  access_token_url,
                  callback_url,
                  scope):
         self.request = request
-        self.authorization_url = authorization_url
         self.access_token_url = access_token_url
         self.callback_url = callback_url
         self.consumer_key = consumer_key
@@ -23,7 +24,7 @@ class OAuth2Client(object):
         self.scope = ' '.join(scope)
         self.state = None
 
-    def get_redirect_url(self):
+    def get_redirect_url(self, authorization_url, extra_params):
         params = {
             'client_id': self.consumer_key,
             'redirect_uri': self.callback_url,
@@ -32,7 +33,8 @@ class OAuth2Client(object):
         }
         if self.state:
             params['state'] = self.state
-        return '%s?%s' % (self.authorization_url, urllib.urlencode(params))
+        params.update(extra_params)
+        return '%s?%s' % (authorization_url, urlencode(params))
 
     def get_access_token(self, code):
         params = {'client_id': self.consumer_key,
@@ -46,13 +48,13 @@ class OAuth2Client(object):
         resp = requests.post(url, params)
         access_token = None
         if resp.status_code == 200:
-            if resp.headers['content-type'].split(';')[0] == 'application/json':
-                data = resp.json()
+            # Weibo sends json via 'text/plain;charset=UTF-8'
+            if (resp.headers['content-type'].split(';')[0] == 'application/json'
+                or resp.text[:2] == '{"'):
+                access_token = resp.json()
             else:
-                data = dict(urlparse.parse_qsl(resp.content))
-            access_token = data.get('access_token')
-        if not access_token:
+                access_token = dict(parse_qsl(resp.text))
+        if not access_token or 'access_token' not in access_token:
             raise OAuth2Error('Error retrieving access token: %s' 
                               % resp.content)
-            
         return access_token

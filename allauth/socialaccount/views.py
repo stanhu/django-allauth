@@ -1,63 +1,87 @@
-from django.utils.translation import ugettext_lazy as _
 from django.contrib import messages
 from django.http import HttpResponseRedirect
-from django.core.urlresolvers import reverse
+from django.core.urlresolvers import reverse, reverse_lazy
 from django.contrib.sites.models import Site
-from django.template import RequestContext
-from django.shortcuts import render_to_response
 from django.contrib.auth.decorators import login_required
+from django.views.generic.base import View, TemplateView
+from django.views.generic.edit import FormView
 
-from forms import DisconnectForm, SignupForm
-
-import helpers
-
-
-def signup(request, **kwargs):
-    if request.user.is_authenticated():
-        return HttpResponseRedirect(reverse(connections))
-    sociallogin = request.session.get('socialaccount_sociallogin')
-    if not sociallogin:
-        return HttpResponseRedirect(reverse('account_login'))
-    form_class = kwargs.pop("form_class", SignupForm)
-    template_name = kwargs.pop("template_name", 'socialaccount/signup.html')
-    if request.method == "POST":
-        form = form_class(request.POST, sociallogin=sociallogin)
-        if form.is_valid():
-            form.save(request)
-            return helpers.complete_social_signup(request, sociallogin)
-    else:
-        form = form_class(sociallogin=sociallogin)
-    dictionary = dict(site=Site.objects.get_current(),
-                      account=sociallogin.account,
-                      form=form)
-    return render_to_response(template_name, dictionary, 
-                              RequestContext(request))
+from ..account.views import (CloseableSignupMixin,
+                             RedirectAuthenticatedUserMixin)
+from ..account.adapter import get_adapter as get_account_adapter
+from .adapter import get_adapter
+from .models import SocialLogin
+from .forms import DisconnectForm, SignupForm
+from . import helpers
 
 
-def login_cancelled(request):
-    d = {}
-    return render_to_response('socialaccount/login_cancelled.html', d, 
-                              context_instance=RequestContext(request))
+class SignupView(RedirectAuthenticatedUserMixin, CloseableSignupMixin,
+                 FormView):
+    form_class = SignupForm
+    template_name = 'socialaccount/signup.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        self.sociallogin = SocialLogin \
+            .deserialize(request.session.get('socialaccount_sociallogin'))
+        if not self.sociallogin:
+            return HttpResponseRedirect(reverse('account_login'))
+        return super(SignupView, self).dispatch(request, *args, **kwargs)
+
+    def is_open(self):
+        return get_adapter().is_open_for_signup(self.request,
+                                                self.sociallogin)
+
+    def get_form_kwargs(self):
+        ret = super(SignupView, self).get_form_kwargs()
+        ret['sociallogin'] = self.sociallogin
+        return ret
+
+    def form_valid(self, form):
+        form.save(self.request)
+        return helpers.complete_social_signup(self.request,
+                                              self.sociallogin)
+
+    def get_context_data(self, **kwargs):
+        ret = super(SignupView, self).get_context_data(**kwargs)
+        ret.update(dict(site=Site.objects.get_current(),
+                        account=self.sociallogin.account))
+        return ret
+
+    def get_authenticated_redirect_url(self):
+        return reverse(connections)
+
+signup = SignupView.as_view()
 
 
-def login_error(request):
-    return helpers.render_authentication_error(request)
+class LoginCancelledView(TemplateView):
+    template_name = "socialaccount/login_cancelled.html"
+
+login_cancelled = LoginCancelledView.as_view()
 
 
-@login_required
-def connections(request):
-    form = None
-    if request.method == 'POST':
-        form = DisconnectForm(request.POST, user=request.user)
-        if form.is_valid():
-            messages.add_message(request, messages.INFO, 
-                                 _('The social account has been disconnected'))
-            form.save()
-            form = None
-    if not form:
-        form = DisconnectForm(user=request.user)
-    d = dict(form=form)
-    return render_to_response(
-            'socialaccount/connections.html',
-            d,
-            context_instance=RequestContext(request))
+class LoginErrorView(View):
+    def get(self, request):
+        return helpers.render_authentication_error(request)
+
+login_error = LoginErrorView.as_view()
+
+
+class ConnectionsView(FormView):
+    template_name = "socialaccount/connections.html"
+    form_class = DisconnectForm
+    success_url = reverse_lazy("socialaccount_connections")
+
+    def get_form_kwargs(self):
+        kwargs = super(ConnectionsView, self).get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
+
+    def form_valid(self, form):
+        get_account_adapter().add_message(self.request,
+                                          messages.INFO,
+                                          'socialaccount/messages/'
+                                          'account_disconnected.txt')
+        form.save()
+        return super(ConnectionsView, self).form_valid(form)
+
+connections = login_required(ConnectionsView.as_view())

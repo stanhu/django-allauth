@@ -1,15 +1,16 @@
 from django.contrib.auth.backends import ModelBackend
 from django.db.models import Q
 
-from allauth.utils import get_user_model
+from ..utils import get_user_model
 
-from app_settings import AuthenticationMethod
-import app_settings
+from .app_settings import AuthenticationMethod
+from . import app_settings
 
 User = get_user_model()
 
+
 class AuthenticationBackend(ModelBackend):
-    
+
     def authenticate(self, **credentials):
         ret = None
         if app_settings.AUTHENTICATION_METHOD == AuthenticationMethod.EMAIL:
@@ -24,7 +25,17 @@ class AuthenticationBackend(ModelBackend):
         return ret
 
     def _authenticate_by_username(self, **credentials):
-        return super(AuthenticationBackend, self).authenticate(**credentials)
+        username_field = app_settings.USER_MODEL_USERNAME_FIELD
+        if not username_field:
+            return None
+        try:
+            # Username query is case insensitive
+            query = {username_field+'__iexact': credentials["username"]}
+            user = User.objects.get(**query)
+            if user.check_password(credentials["password"]):
+                return user
+        except User.DoesNotExist:
+            return None
 
     def _authenticate_by_email(self, **credentials):
         # Even though allauth will pass along `email`, other apps may
@@ -35,8 +46,7 @@ class AuthenticationBackend(ModelBackend):
         email = credentials.get('email', credentials.get('username'))
         if email:
             users = User.objects.filter(Q(email__iexact=email)
-                                        | Q(emailaddress__email__iexact
-                                            =email))
+                                        | Q(emailaddress__email__iexact=email))
             for user in users:
                 if user.check_password(credentials["password"]):
                     return user

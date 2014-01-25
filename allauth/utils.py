@@ -1,52 +1,52 @@
 import re
 import unicodedata
+import json
 
 from django.core.exceptions import ImproperlyConfigured
 from django.core.validators import validate_email, ValidationError
-from django.db.models import EmailField
-from django.utils.http import urlencode
-from django.contrib.auth import REDIRECT_FIELD_NAME
-from django.utils import importlib
+from django.core import urlresolvers
+from django.db.models import FieldDoesNotExist
+from django.db.models.fields import (DateTimeField, DateField,
+                                     EmailField, TimeField)
+from django.utils import importlib, six, dateparse
+from django.utils.datastructures import SortedDict
+from django.core.serializers.json import DjangoJSONEncoder
+try:
+    from django.utils.encoding import force_text
+except ImportError:
+    from django.utils.encoding import force_unicode as force_text
 
-import app_settings
-
-def get_login_redirect_url(request, 
-                           fallback=True):
-    """
-    Returns a url to redirect to after the login
-    
-    TODO: 
-    - Cleanup, check overlap with account.utils.get_default_redirect
-    - Move to allauth.account
-    """
-    if fallback and type(fallback) == bool:
-        from account.adapter import get_adapter
-        fallback = get_adapter().get_login_redirect_url(request)
-    url = request.REQUEST.get(REDIRECT_FIELD_NAME) or fallback
-    return url
+from . import app_settings
 
 
-def passthrough_login_redirect_url(request, url):
-    assert url.find("?") < 0  # TODO: Handle this case properly
-    next = get_login_redirect_url(request, fallback=None)
-    if next:
-        url = url + '?' + urlencode({ REDIRECT_FIELD_NAME: next })
-    return url
+def _generate_unique_username_base(txts):
+    username = None
+    for txt in txts:
+        username = unicodedata.normalize('NFKD', force_text(txt))
+        username = username.encode('ascii', 'ignore').decode('ascii')
+        username = force_text(re.sub('[^\w\s@+.-]', '', username).lower())
+        # Django allows for '@' in usernames in order to accomodate for
+        # project wanting to use e-mail for username. In allauth we don't
+        # use this, we already have a proper place for putting e-mail
+        # addresses (EmailAddress), so let's not use the full e-mail
+        # address and only take the part leading up to the '@'.
+        username = username.split('@')[0]
+        username = username.strip()
+        if username:
+            break
+    return username or 'user'
 
 
-def generate_unique_username(txt):
-    username = unicodedata.normalize('NFKD', unicode(txt))
-    username = username.encode('ascii', 'ignore')
-    username = unicode(re.sub('[^\w\s@+.-]', '', username).lower())
-    # Django allows for '@' in usernames in order to accomodate for
-    # project wanting to use e-mail for username. In allauth we don't
-    # use this, we already have a proper place for putting e-mail
-    # addresses (EmailAddress), so let's not use the full e-mail
-    # address and only take the part leading up to the '@'.
-    username = username.split('@')[0]
-    username = username.strip() or 'user'
+def generate_unique_username(txts):
+    from .account.app_settings import USER_MODEL_USERNAME_FIELD
+    username = _generate_unique_username_base(txts)
     User = get_user_model()
-    max_length = User._meta.get_field('username').max_length
+    try:
+        max_length = User._meta.get_field(USER_MODEL_USERNAME_FIELD).max_length
+    except FieldDoesNotExist:
+        raise ImproperlyConfigured(
+            "USER_MODEL_USERNAME_FIELD does not exist in user-model"
+        )
     i = 0
     while True:
         try:
@@ -55,7 +55,8 @@ def generate_unique_username(txt):
             else:
                 pfx = ''
             ret = username[0:max_length - len(pfx)] + pfx
-            User.objects.get(username=ret)
+            query = {USER_MODEL_USERNAME_FIELD + '__iexact': ret}
+            User.objects.get(**query)
             i += 1
         except User.DoesNotExist:
             return ret
@@ -74,26 +75,29 @@ def valid_email_or_none(email):
 
 
 def email_address_exists(email, exclude_user=None):
-    from allauth.account.models import EmailAddress
+    from .account import app_settings as account_settings
+    from .account.models import EmailAddress
 
     emailaddresses = EmailAddress.objects
     if exclude_user:
         emailaddresses = emailaddresses.exclude(user=exclude_user)
     ret = emailaddresses.filter(email__iexact=email).exists()
     if not ret:
-        users = get_user_model().objects
-        if exclude_user:
-            users = users.exclude(user=exclude_user)
-        ret = users.filter(email__iexact=email).exists()
+        email_field = account_settings.USER_MODEL_EMAIL_FIELD
+        if email_field:
+            users = get_user_model().objects
+            if exclude_user:
+                users = users.exclude(pk=exclude_user.pk)
+            ret = users.filter(**{email_field+'__iexact': email}).exists()
     return ret
-
 
 
 def import_attribute(path):
-    assert isinstance(path, str)
-    pkg, attr = path.rsplit('.',1)
+    assert isinstance(path, six.string_types)
+    pkg, attr = path.rsplit('.', 1)
     ret = getattr(importlib.import_module(pkg), attr)
     return ret
+
 
 def import_callable(path_or_callable):
     if not hasattr(path_or_callable, '__call__'):
@@ -109,10 +113,68 @@ def get_user_model():
     try:
         app_label, model_name = app_settings.USER_MODEL.split('.')
     except ValueError:
-        raise ImproperlyConfigured("AUTH_USER_MODEL must be of the form 'app_label.model_name'")
+        raise ImproperlyConfigured("AUTH_USER_MODEL must be of the"
+                                   " form 'app_label.model_name'")
     user_model = get_model(app_label, model_name)
     if user_model is None:
-        raise ImproperlyConfigured("AUTH_USER_MODEL refers to model '%s' that has not been installed" % app_settings.USER_MODEL)
+        raise ImproperlyConfigured("AUTH_USER_MODEL refers to model"
+                                   " '%s' that has not been installed"
+                                   % app_settings.USER_MODEL)
     return user_model
 
-    
+
+def resolve_url(to):
+    """
+    Subset of django.shortcuts.resolve_url (that one is 1.5+)
+    """
+    try:
+        return urlresolvers.reverse(to)
+    except urlresolvers.NoReverseMatch:
+        # If this doesn't "feel" like a URL, re-raise.
+        if '/' not in to and '.' not in to:
+            raise
+    # Finally, fall back and assume it's a URL
+    return to
+
+
+def serialize_instance(instance):
+    """
+    Since Django 1.6 items added to the session are no longer pickled,
+    but JSON encoded by default. We are storing partially complete models
+    in the session (user, account, token, ...). We cannot use standard
+    Django serialization, as these are models are not "complete" yet.
+    Serialization will start complaining about missing relations et al.
+    """
+    ret = dict([(k, v)
+                for k, v in instance.__dict__.items()
+                if not k.startswith('_')])
+    return json.loads(json.dumps(ret, cls=DjangoJSONEncoder))
+
+
+def deserialize_instance(model, data):
+    ret = model()
+    for k, v in data.items():
+        if v is not None:
+            try:
+                f = model._meta.get_field(k)
+                if isinstance(f, DateTimeField):
+                    v = dateparse.parse_datetime(v)
+                elif isinstance(f, TimeField):
+                    v = dateparse.parse_time(v)
+                elif isinstance(f, DateField):
+                    v = dateparse.parse_date(v)
+            except FieldDoesNotExist:
+                pass
+        setattr(ret, k, v)
+    return ret
+
+
+def set_form_field_order(form, fields_order):
+    if isinstance(form.fields, SortedDict):
+        form.fields.keyOrder = fields_order
+    else:
+        # Python 2.7+
+        from collections import OrderedDict
+        assert isinstance(form.fields, OrderedDict)
+        form.fields = OrderedDict((f, form.fields[f])
+                                  for f in fields_order)

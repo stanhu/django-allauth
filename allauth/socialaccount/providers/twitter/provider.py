@@ -1,5 +1,6 @@
 from allauth.socialaccount import providers
-from allauth.socialaccount.providers.base import ProviderAccount
+from allauth.socialaccount.providers.base import (ProviderAccount,
+                                                  AuthAction)
 from allauth.socialaccount.providers.oauth.provider import OAuthProvider
 
 
@@ -23,9 +24,9 @@ class TwitterAccount(ProviderAccount):
             ret = profile_image_url.replace('_normal', '')
         return ret
 
-    def __unicode__(self):
+    def to_str(self):
         screen_name = self.get_screen_name()
-        return screen_name or super(TwitterAccount, self).__unicode__()
+        return screen_name or super(TwitterAccount, self).to_str()
 
 
 class TwitterProvider(OAuthProvider):
@@ -33,6 +34,20 @@ class TwitterProvider(OAuthProvider):
     name = 'Twitter'
     package = 'allauth.socialaccount.providers.twitter'
     account_class = TwitterAccount
-        
-        
+
+    def get_auth_url(self, request, action):
+        if action == AuthAction.REAUTHENTICATE:
+            url = 'https://api.twitter.com/oauth/authorize'
+        else:
+            url = 'https://api.twitter.com/oauth/authenticate'
+        return url
+
+    def extract_uid(self, data):
+        return data['id']
+
+    def extract_common_fields(self, data):
+        return dict(username=data.get('screen_name'),
+                    name=data.get('name'))
+
+
 providers.registry.register(TwitterProvider)

@@ -3,7 +3,7 @@ import os
 import sys
 from fnmatch import fnmatchcase
 
-from setuptools import setup,find_packages
+from setuptools import setup, find_packages
 from distutils.util import convert_path
 
 # Provided as an attribute, so you can append to these instead
@@ -96,19 +96,30 @@ excluded_directories = standard_exclude_directories
 
 package_data = find_package_data(exclude_directories=excluded_directories)
 
+test_requirements = []
+if sys.version_info[0] < 3:
+    openid_package = 'python-openid >= 2.2.5'
+    test_requirements.append('mock >= 1.0.1')
+else:
+    openid_package = 'python3-openid >= 3.0.1'
+
 METADATA = dict(
     name='django-allauth',
-    version='0.8.3',
+    version='0.15.0',
     author='Raymond Penners',
     author_email='raymond.penners@intenct.nl',
-    description='Integrated set of Django applications addressing authentication, registration, account management as well as 3rd party (social) account authentication.',
+    description='Integrated set of Django applications addressing'
+    ' authentication, registration, account management as well as'
+    ' 3rd party (social) account authentication.',
     long_description=open('README.rst').read(),
     url='http://github.com/pennersr/django-allauth',
-    keywords='django auth account social openid twitter facebook oauth registration',
-    install_requires=['django',
-                      'oauth2',
-                      'python-openid',
-                      'requests'],
+    keywords='django auth account social openid twitter facebook oauth'
+    ' registration',
+    tests_require=test_requirements,
+    install_requires=['Django >= 1.4.3',
+                      openid_package,
+                      'requests-oauthlib >= 0.3.0',
+                      'requests >= 1.0.3'],
     include_package_data=True,
     classifiers=[
         'Development Status :: 4 - Beta',
@@ -118,10 +129,13 @@ METADATA = dict(
         'Topic :: Internet',
         'Operating System :: OS Independent',
         'Programming Language :: Python',
+        'Programming Language :: Python :: 2.6',
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3.3',
         'Framework :: Django',
     ],
     packages=find_packages(exclude=['example']),
-    package_data=package_data
+    package_data=package_data,
 )
 
 if __name__ == '__main__':

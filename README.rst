@@ -2,6 +2,19 @@
 Welcome to django-allauth!
 ==========================
 
+.. image:: https://badge.fury.io/py/django-allauth.png
+   :target: http://badge.fury.io/py/django-allauth
+
+.. image:: https://travis-ci.org/pennersr/django-allauth.png
+   :target: http://travis-ci.org/pennersr/django-allauth
+
+.. image:: https://pypip.in/d/django-allauth/badge.png
+   :target: https://crate.io/packages/django-allauth?version=latest
+
+.. image:: https://coveralls.io/repos/pennersr/django-allauth/badge.png?branch=master
+   :alt: Coverage Status
+   :target: https://coveralls.io/r/pennersr/django-allauth
+
 Integrated set of Django applications addressing authentication,
 registration, account management as well as 3rd party (social) account
 authentication.
@@ -9,13 +22,10 @@ authentication.
 Rationale
 =========
 
-Why?
-----
-
 Most existing Django apps that address the problem of social
 authentication focus on just that. You typically need to integrate
 another app in order to support authentication via a local
-account. 
+account.
 
 This approach separates the worlds of local and social
 authentication. However, there are common scenarios to be dealt with
@@ -33,28 +43,19 @@ integrated authentication app that allows for both local and social
 authentication, with flows that just work.
 
 
-Why Not?
---------
-
-From the start the focus has been to deliver an integrated experience
-and flows that just work, and to a lesser extent a completely
-pluggable social authentication framework.
-
-Earlier versions of the project suffered from this, e.g. each provider
-had its own implementation with its own social account model
-definition. 
-
-Work is well underway to rectify this situation. These days, social
-account models have been unified, and adding support for additional
-OAuth/OAuth2 providers is child's play. All hardcodedness with respect
-to providers has been removed.
-
-Ofcourse, there is always more that can be done. Do know that the
-biggest hurdles to overcome the initial shortcomings have been
-taken...
-
 Overview
 ========
+
+Requirements
+------------
+
+- Python 2.6, 2.7 or 3.3
+
+- Django (1.4.3+)
+
+- python-openid or python3-openid (depending on your Python version)
+
+- requests and requests-oauthlib
 
 Supported Flows
 ---------------
@@ -77,11 +78,19 @@ Supported Flows
 Supported Providers
 -------------------
 
+- AngelList (OAuth2)
+
+- Bitly (OAuth2)
+
+- Dropbox (OAuth)
+
 - Facebook (both OAuth2 and JS SDK)
 
 - Github
 
 - Google (OAuth2)
+
+- Instagram
 
 - LinkedIn
 
@@ -93,11 +102,19 @@ Supported Providers
 
 - Stack Exchange (OAuth2)
 
+- Twitch (OAuth2)
+
 - Twitter
+
+- Vimeo (OAuth)
+
+- VK (OAuth2)
+
+- Weibo (OAuth2)
 
 Note: OAuth/OAuth2 support is built using a common code base, making it easy to add support for additional OAuth/OAuth2 providers. More will follow soon...
 
- 
+
 Features
 --------
 
@@ -154,18 +171,30 @@ settings.py::
 
     INSTALLED_APPS = (
         ...
+        # The Django sites framework is required
+        'django.contrib.sites',
+
         'allauth',
         'allauth.account',
         'allauth.socialaccount',
+        # ... include the providers you want to enable:
+        'allauth.socialaccount.providers.angellist',
+        'allauth.socialaccount.providers.bitly',
+        'allauth.socialaccount.providers.dropbox',
         'allauth.socialaccount.providers.facebook',
-        'allauth.socialaccount.providers.google',
         'allauth.socialaccount.providers.github',
+        'allauth.socialaccount.providers.google',
+        'allauth.socialaccount.providers.instagram',
         'allauth.socialaccount.providers.linkedin',
         'allauth.socialaccount.providers.openid',
         'allauth.socialaccount.providers.persona',
         'allauth.socialaccount.providers.soundcloud',
         'allauth.socialaccount.providers.stackexchange',
+        'allauth.socialaccount.providers.twitch',
         'allauth.socialaccount.providers.twitter',
+        'allauth.socialaccount.providers.vimeo',
+        'allauth.socialaccount.providers.vk',
+        'allauth.socialaccount.providers.weibo',
         ...
     )
 
@@ -176,6 +205,21 @@ urls.py::
         (r'^accounts/', include('allauth.urls')),
         ...
     )
+
+
+Post-Installation
+-----------------
+
+In your django root execute the command below to create your database tables::
+
+    ./manage.py syncdb
+
+Now start your server, visit your admin pages (http://localhost:8000/admin )
+and follow these steps:
+
+  1. Add a Site object for your domain
+  2. For each provider you want, enter in Social App → Add Social App
+  3. Choose the site, social provider and the credentials you obtained from the provider.
 
 
 Configuration
@@ -190,6 +234,10 @@ ACCOUNT_ADAPTER (="allauth.account.adapter.DefaultAccountAdapter")
 ACCOUNT_AUTHENTICATION_METHOD (="username" | "email" | "username_email")
   Specifies the login method to use -- whether the user logs in by
   entering his username, e-mail address, or either one of both.
+
+ACCOUNT_CONFIRM_EMAIL_ON_GET (=False)
+  Determines whether or not an e-mail address is automatically confirmed
+  by a mere GET request.
 
 ACCOUNT_EMAIL_CONFIRMATION_ANONYMOUS_REDIRECT_URL (=settings.LOGIN_URL)
   The URL to redirect to after a successful e-mail confirmation, in case no
@@ -206,8 +254,9 @@ ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS (=3)
 ACCOUNT_EMAIL_REQUIRED (=False)
   The user is required to hand over an e-mail address when signing up.
 
-ACCOUNT_EMAIL_VERIFICATION (="mandatory" | "optional" | "none")
-  Determines the e-mail verification method during signup. When set to
+ACCOUNT_EMAIL_VERIFICATION (="optional")
+  Determines the e-mail verification method during signup -- choose
+  one of `"mandatory"`, `"optional"`, or `"none"`. When set to
   "mandatory" the user is blocked from logging in until the email
   address is verified. Choose "optional" or "none" to allow logins
   with an unverified e-mail address. In case of "optional", the e-mail
@@ -217,6 +266,21 @@ ACCOUNT_EMAIL_VERIFICATION (="mandatory" | "optional" | "none")
 ACCOUNT_EMAIL_SUBJECT_PREFIX (="[Site] ")
   Subject-line prefix to use for email messages sent. By default, the
   name of the current `Site` (`django.contrib.sites`) is used.
+
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = (="http")
+  The default protocol used for when generating URLs, e.g. for the
+  password forgotten procedure. Note that this is a default only --
+  the protocol is not enforced by any of the views. There are numerous
+  third party packages available for enforcing `https`, use those.
+
+ACCOUNT_LOGOUT_ON_GET (=False)
+  Determines whether or not the user is automatically logged out by a
+  mere GET request. See documentation for the `LogoutView` for
+  details.
+
+ACCOUNT_LOGOUT_REDIRECT_URL (="/")
+  The URL (or URL name) to return to after the user logs out. This is
+  the counterpart to Django's `LOGIN_REDIRECT_URL`.
 
 ACCOUNT_SIGNUP_FORM_CLASS (=None)
   A string pointing to a custom form class
@@ -231,6 +295,14 @@ ACCOUNT_SIGNUP_PASSWORD_VERIFICATION (=True)
 ACCOUNT_UNIQUE_EMAIL (=True)
   Enforce uniqueness of e-mail addresses.
 
+ACCOUNT_USER_MODEL_USERNAME_FIELD (="username")
+  The name of the field containing the `username`, if any. See custom
+  user models.
+
+ACCOUNT_USER_MODEL_EMAIL_FIELD (="email")
+  The name of the field containing the `email`, if any. See custom
+  user models.
+
 ACCOUNT_USER_DISPLAY (=a callable returning `user.username`)
   A callable (or string of the form `'some.module.callable_name'`)
   that takes a user as its only argument and returns the display name
@@ -238,6 +310,9 @@ ACCOUNT_USER_DISPLAY (=a callable returning `user.username`)
 
 ACCOUNT_USERNAME_MIN_LENGTH (=1)
   An integer specifying the minimum allowed length of a username.
+
+ACCOUNT_USERNAME_BLACKLIST (=[])
+  A list of usernames that can't be used by user.
 
 ACCOUNT_USERNAME_REQUIRED (=True)
   The user is required to enter a username when signing up. Note that
@@ -251,26 +326,161 @@ ACCOUNT_PASSWORD_INPUT_RENDER_VALUE (=False)
 ACCOUNT_PASSWORD_MIN_LENGTH (=6)
   An integer specifying the minimum password length.
 
+SOCIALACCOUNT_ADAPTER (="allauth.socialaccount.adapter.DefaultSocialAccountAdapter")
+  Specifies the adapter class to use, allowing you to alter certain
+  default behaviour.
+
 SOCIALACCOUNT_QUERY_EMAIL (=ACCOUNT_EMAIL_REQUIRED)
   Request e-mail address from 3rd party account provider? E.g. using
   OpenID AX, or the Facebook "email" permission.
 
-SOCIALACCOUNT_AUTO_SIGNUP (=True) 
+SOCIALACCOUNT_AUTO_SIGNUP (=True)
   Attempt to bypass the signup form by using fields (e.g. username,
   email) retrieved from the social account provider. If a conflict
   arises due to a duplicate e-mail address the signup form will still
   kick in.
 
-SOCIALACCOUNT_AVATAR_SUPPORT (= 'avatar' in settings.INSTALLED_APPS)
-  Enable support for django-avatar. When enabled, the profile image of
-  the user is copied locally into django-avatar at signup.
+SOCIALACCOUNT_EMAIL_REQUIRED (=ACCOUNT_EMAIL_REQUIRED)
+  The user is required to hand over an e-mail address when signing up
+  using a social account.
+
+SOCIALACCOUNT_EMAIL_VERIFICATION (=ACCOUNT_EMAIL_VERIFICATION)
+  As `ACCOUNT_EMAIL_VERIFICATION`, but for social accounts.
 
 SOCIALACCOUNT_PROVIDERS (= dict)
-    Dictionary containing provider specific settings.
+  Dictionary containing provider specific settings.
 
 
 Upgrading
 ---------
+
+From 0.14.2
+***********
+
+- The `/accounts/login/` view now supports AJAX requests.
+
+- Instead of directly rendering and returning a template, logging in
+  while the account is inactive or not yet confirmed now redirects to
+  two new views: `/accounts/inactive/` respectively
+  `/accounts/confirm-email/`.
+
+- The `account/verification_sent.html` template no longer receives the
+  e-mail address in the context (`email`). Note that a message
+  containing that e-mail address is still emitted using the messages
+  framework.
+
+- The `/accounts/confirm_email/key/` view has been
+  renamed to `/accounts/confirm-email/` (human friendlier). Redirects
+  are in place to handle old still pending confirmations.
+
+- Built-in support for django-avatar has been removed. Offering such
+  functionality means making choices which may not be valid for
+  everyone. For example, allauth was downloading the image (which can
+  take some time, or even block) in the context of the login, whereas
+  a better place might be some celery background job. Additionally, in
+  case of an error it simply ignored this. How about retries et al?
+  Also, do you want to copy the avatar once at sign up, or do you want
+  to update on each login? All in all, this functionality goes way
+  beyond authentication and should be addressed elsewhere, beyond
+  allauth scope. The original code has been preserved here so that you
+  can easily reinstate it in your own project:
+  https://gist.github.com/pennersr/7571752
+
+
+From 0.14.1
+***********
+
+- In case you were using the internal method
+  `generate_unique_username`, note that its signature has changed. It
+  now takes a list of candidates to base the username on.
+
+From 0.13.0
+***********
+
+- The `socialaccount/account_inactive.html` template has been
+  moved to `account/account_inactive.html`.
+
+- The adapter API for creating and populating users has been
+  overhauled. As a result, the `populate_new_user` adapter methods
+  have disappeared. Please refer to the section on "Creating and
+  Populating User Instances" for more information.
+
+From 0.12.0
+***********
+
+- All account views are now class-based.
+
+- The password reset from key success response now redirects to a
+  "done" view (`/accounts/password/reset/key/done/`). This view has
+  its own `account/password_reset_from_key_done.html` template. In
+  previous versions, the success template was intertwined with the
+  `account/password_reset_from_key.html` template.
+
+From 0.11.1
+***********
+
+- The `{% provider_login_url %}` tag now takes an optional process
+  parameter that indicates how to process the social login. As a
+  result, if you include the template
+  `socialaccount/snippets/provider_list.html` from your own overriden
+  `socialaccount/connections.html` template, you now need to pass
+  along the process parameter as follows:
+  `{% include "socialaccount/snippets/provider_list.html" with process="connect" %}`.
+
+- Instead of inlining the required Facebook SDK Javascript wrapper
+  code into the HTML, it now resides into its own .js file (served
+  with `{% static %}`). If you were using the builtin `fbconnect.html`
+  this change should go by unnoticed.
+
+From 0.9.0
+**********
+
+- Logout no longer happens on GET request. Refer to the `LogoutView`
+  documentation for more background information. Logging out on GET
+  can be restored by the setting `ACCOUNT_LOGOUT_ON_GET`. Furthermore,
+  after logging out you are now redirected to
+  `ACCOUNT_LOGOUT_REDIRECT_URL` instead of rendering the
+  `account/logout.html` template.
+
+- `LOGIN_REDIRECT_URLNAME` is now deprecated. Django 1.5 accepts both
+  URL names and URLs for `LOGIN_REDIRECT_URL`, so we do so as well.
+
+- `DefaultAccountAdapter.stash_email_verified` is now named
+  `stash_verified_email`.
+
+- Django 1.4.3 is now the minimal requirement.
+
+- Dropped dependency on (unmaintained?) oauth2 package, in favor of
+  requests-oauthlib. So you will need to update your (virtual)
+  environment accordingly.
+
+- We noticed a very rare bug that affects end users who add Google
+  social login to existing accounts. The symptom is you end up with
+  users who have multiple primary email addresses which conflicts
+  with assumptions made by the code. In addition to fixing the code
+  that allowed duplicates to occur, there is a managegement command
+  you can run if you think this effects you (and if it doesn't effect
+  you there is no harm in running it anyways if you are unsure):
+
+  - `python manage.py account_unsetmultipleprimaryemails`
+
+    - Will silently remove primary flags for email addresses that
+      aren't the same as `user.email`.
+
+    - If no primary `EmailAddress` is `user.email` it will pick one
+      at random and print a warning.
+
+- The expiry time, if any, is now stored in a new column
+  `SocialToken.expires_at`. Migrations are in place.
+
+- Furthermore, Facebook started returning longer tokens, so the
+  maximum token length was increased. Again, migrations are in place.
+
+- Login and signup views have been turned into class-based views.
+
+- The template variable `facebook_perms` is no longer passed to the
+  "facebook/fbconnect.html" template. Instead, `fb_login_options`
+  containing all options is passed.
 
 From 0.8.3
 **********
@@ -339,7 +549,7 @@ From 0.7.0
 
 - `{% load account_tags %}` is deprecated, simply use: `{% load account %}`
 
-- `{% load socialaccount_tags %}` is deprecated, simply use: 
+- `{% load socialaccount_tags %}` is deprecated, simply use:
   `{% load socialaccount %}`
 
 From 0.5.0
@@ -389,7 +599,7 @@ credentials.
 When creating the OAuth app on the side of the provider pay special
 attention to the callback URL (sometimes also referred to as redirect
 URL). If you do not configure this correctly, you will receive login
-failures when attemtping to log in, such as::
+failures when attempting to log in, such as::
 
     An error occured while attempting to login via your social network account.
 
@@ -401,7 +611,17 @@ Use a callback URL of the form::
 
 For local development, use the following::
 
-    http://127.0.0.1:8000/accounts/twitter/callback/
+    http://127.0.0.1:8000/accounts/twitter/login/callback/
+
+
+AngelList
+---------
+
+Register your OAuth app here: https://angel.co/api/oauth/clients
+
+For local development, use the following callback URL::
+
+    http://localhost:8000/accounts/angellist/login/callback/
 
 
 Facebook
@@ -429,55 +649,94 @@ or::
 The following Facebook settings are available::
 
     SOCIALACCOUNT_PROVIDERS = \
-        { 'facebook': 
-            { 'SCOPE': ['email', 'publish_stream'],
-              'METHOD': 'oauth2' ,
-              'LOCALE_FUNC': 'path.to.callable'} }
+        {'facebook':
+           {'SCOPE': ['email', 'publish_stream'],
+            'AUTH_PARAMS': {'auth_type': 'reauthenticate'},
+            'METHOD': 'oauth2',
+            'LOCALE_FUNC': 'path.to.callable',
+            'VERIFIED_EMAIL': True}}
 
-By default, `email` scope is required depending whether or not
-`SOCIALACCOUNT_QUERY_EMAIL` is enabled.
+METHOD
+    Either `js_sdk` or `oauth2`
 
-The locale for the JS SDK is chosen based on the current active language of
-the request, taking a best guess. This can be customized using the
-`LOCALE_FUNC` setting, which takes either a callable or a path to a callable.
-This callable must take exactly one argument, the request, and return `a
-valid Facebook locale <http://developers.facebook.com/docs/
-internationalization/>`_ as a string::
+SCOPE
+    By default, `email` scope is required depending whether or not
+    `SOCIALACCOUNT_QUERY_EMAIL` is enabled.
 
-    SOCIALACCOUNT_PROVIDERS = \
-        { 'facebook':
-            { 'LOCALE_FUNC': lambda request: 'zh_CN'} }
+AUTH_PARAMS
+    Use `AUTH_PARAMS` to pass along other parameters to the `FB.login`
+    JS SDK call.
+
+LOCALE_FUNC:
+    The locale for the JS SDK is chosen based on the current active language of
+    the request, taking a best guess. This can be customized using the
+    `LOCALE_FUNC` setting, which takes either a callable or a path to a callable.
+    This callable must take exactly one argument, the request, and return `a
+    valid Facebook locale <http://developers.facebook.com/docs/
+    internationalization/>`_ as a string::
+
+        SOCIALACCOUNT_PROVIDERS = \
+            { 'facebook':
+                { 'LOCALE_FUNC': lambda request: 'zh_CN'} }
+
+VERIFIED_EMAIL:
+    It is not clear from the Facebook documentation whether or not the
+    fact that the account is verified implies that the e-mail address
+    is verified as well. For example, verification could also be done
+    by phone or credit card. To be on the safe side, the default is to
+    treat e-mail addresses from Facebook as unverified. But, if you
+    feel that is too paranoid, then use this setting to mark them as
+    verified.
+
+App registration (get your key and secret here)
+    https://developers.facebook.com/apps
+
+Development callback URL
+    Leave your App Domains empty and put in he section `Website with Facebook
+    Login` put this as your Site URL: `http://localhost:8000`
+
 
 Google
 ------
 
-The Google provider is OAuth2 based. Register your Google API client
-over at `https://code.google.com/apis/console/`. Make sure you list a
-redirect uri of the form
-`http://example.com/accounts/google/login/callback/`.
+The Google provider is OAuth2 based. More info:
+`http://code.google.com/apis/accounts/docs/OAuth2.html#Registering`.
 
 You can specify the scope to use as follows::
 
     SOCIALACCOUNT_PROVIDERS = \
-        { 'google': 
-            { 'SCOPE': ['https://www.googleapis.com/auth/userinfo.profile'] } }
+        { 'google':
+            { 'SCOPE': ['https://www.googleapis.com/auth/userinfo.profile'],
+              'AUTH_PARAMS': { 'access_type': 'online' } }}
 
 By default, `profile` scope is required, and optionally `email` scope
 depending on whether or not `SOCIALACCOUNT_QUERY_EMAIL` is enabled.
+
+App registration (get your key and secret here)
+        https://code.google.com/apis/console/
+
+Development callback URL
+        Make sure you list a redirect uri of the form
+        `http://example.com/accounts/google/login/callback/`. You can fill
+        multiple URLs, one for each test domain.
 
 
 LinkedIn
 --------
 
-The LinkedIn provider is OAuth based. Register your LinkedIn app over
-at `https://www.linkedin.com/secure/developer?newapp=`. Leave the
-OAuth redirect URL empty.
+The LinkedIn provider is OAuth based.
 
-You can specify the scope to use as follows::
+You can specify the scope and fields to fetch as follows::
 
     SOCIALACCOUNT_PROVIDERS = \
-        { 'linkedin': 
-            { 'SCOPE': ['r_emailaddress'] } }
+        {'linkedin':
+          {'SCOPE': ['r_emailaddress'],
+           'PROFILE_FIELDS: ['id',
+                             'first-name',
+                             'last-name',
+                             'email-address',
+                             'picture-url',
+                             'public-profile-url']}}
 
 By default, `r_emailaddress` scope is required depending on whether or
 not `SOCIALACCOUNT_QUERY_EMAIL` is enabled.
@@ -488,6 +747,10 @@ scope enabled. Please refer to
 `https://developer.linkedin.com/forum/when-will-old-apps-have-scope-parameter-enabled`
 for more background information.
 
+App registration (get your key and secret here)
+        https://www.linkedin.com/secure/developer?newapp=
+Development callback URL
+        Leave the OAuth redirect URL empty.
 
 OpenID
 ------
@@ -500,8 +763,8 @@ providers displayed by the builtin templates can be configured as
 follows::
 
     SOCIALACCOUNT_PROVIDERS = \
-        { 'openid': 
-            { 'SERVERS': 
+        { 'openid':
+            { 'SERVERS':
                 [dict(id='yahoo',
                       name='Yahoo',
                       openid_url='http://me.yahoo.com'),
@@ -529,7 +792,7 @@ passed as is to the `navigator.id.request()` method to influence the
 look and feel of the Persona dialog::
 
     SOCIALACCOUNT_PROVIDERS = \
-        { 'persona': 
+        { 'persona':
             { 'REQUEST_PARAMETERS': {'siteName': 'Example' } } }
 
 
@@ -537,13 +800,13 @@ SoundCloud
 ----------
 
 SoundCloud allows you to choose between OAuth1 and OAuth2.  Choose the
-latter. 
+latter.
 
 
 Stack Exchange
 --------------
 
-Register your OAuth2 over at
+Register your OAuth2 app over at
 `http://stackapps.com/apps/oauth/register`.  Do not enable "Client
 Side Flow". For local development you can simply use "localhost" for
 the OAuth domain.
@@ -555,8 +818,45 @@ Overflow, or Server Fault). This can be controlled by means of the
 `SITE` setting::
 
     SOCIALACCOUNT_PROVIDERS = \
-        { 'stackexchange': 
+        { 'stackexchange':
             { 'SITE': 'stackoverflow' } }
+
+
+Twitch
+------
+Register your OAuth2 app over at
+`http://www.twitch.tv/kraken/oauth2/clients/new`.
+
+Vimeo
+-----
+
+App registration
+    https://developer.vimeo.com/apps
+
+Development callback URL
+    http://localhost:8000
+
+
+VK
+--
+
+App registration
+    http://vk.com/apps?act=settings
+
+Development callback URL ("Site address")
+    http://localhost
+
+
+Weibo
+-----
+
+Register your OAuth2 app over at
+`http://open.weibo.com/apps`. Unfortunately, Weibo does not allow for
+specifying a port number in the authorization callback URL. So for
+development purposes you have to use a callback url of the form
+`http://127.0.0.1/accounts/weibo/login/callback/` and run `runserver
+127.0.0.1:80`.
+
 
 
 Signals
@@ -570,7 +870,7 @@ The following signals are emitted:
 
 - `allauth.account.signals.user_signed_up`
 
-  Sent when a user signs up for an account. This is signal is
+  Sent when a user signs up for an account. This signal is
   typically followed by a `user_logged_in`, unless e-mail verification
   prohibits the user to log in.
 
@@ -583,6 +883,40 @@ The following signals are emitted:
   tokens and profile information, if applicable for the provider, is
   provided.
 
+- `allauth.socialaccount.signals.social_account_added`
+
+  Sent after a user connects a social account to a his local account.
+
+- `allauth.socialaccount.signals.social_account_removed`
+
+  Sent after a user disconnects a social account from his local
+  account.
+
+
+Views
+=====
+
+Logout
+------
+
+The logout view (`allauth.account.views.LogoutView`) requests for
+confirmation before logging out. The user is logged out only when the
+confirmation is received by means of a POST request.
+
+If you are wondering why, consider what happens when a malicious user
+embeds the following image in a post::
+
+    <img src="http://example.com/accounts/logout/">
+
+For this and more background information on the subject, see:
+
+- https://code.djangoproject.com/ticket/15619
+- http://stackoverflow.com/questions/3521290/logout-get-or-post
+
+If you insist on having logout on GET, then please consider adding a
+bit of Javascript to automatically turn a click on a logout link into
+a POST. As a last resort, you can set `ACCOUNT_LOGOUT_ON_GET` to
+`True`.
 
 Templates
 =========
@@ -629,8 +963,25 @@ Use the `provider_login_url` tag to generate provider specific login URLs::
     <a href="{% provider_login_url "openid" openid="https://www.google.com/accounts/o8/id" next="/success/url/" %}">Google</a>
     <a href="{% provider_login_url "twitter" %}">Twitter</a>
 
+Here, you can pass along an optional `process` parameter that
+indicates how to process the social login. You can choose between
+`login` and `connect`::
 
-For easy access to the social accounts for a user::
+    <a href="{% provider_login_url "twitter" process="connect" %}">Connect a Twitter account</a>
+
+Furthermore, you can pass along an `action` parameter with value
+`reauthenticate` to indicate that you want the user to be re-prompted
+for authentication even if he already signed in before. For now, this
+is supported by Facebook, Google and Twitter only.
+
+For Javascript based logins (e.g. when you enable the Facebook JS
+SDK), you will need to make sure that the required Javascript is
+loaded. The following tag loads all scripts for the enabled
+providers::
+
+    {% provider_media_js %}
+
+For easy access to the social accounts for a user use::
 
     {% get_social_accounts user as accounts %}
 
@@ -668,10 +1019,209 @@ The behavior is as follows:
   address.
 
 
+Advanced Usage
+==============
+
+Custom User Models
+------------------
+
+If you use a custom user model you need to specify what field
+represents the `username`, if any. Here, `username` really refers to
+the field representing the nick name the user uses to login, and not
+some unique identifier (possibly including an e-mail adddress) as is
+the case for Django's `AbstractBaseUser.USERNAME_FIELD`.
+
+Meaning, if your custom user model does not have a `username` field
+(again, not to be mistaken with an e-mail address or user id), you
+will need to set `ACCOUNT_USER_MODEL_USERNAME_FIELD` to `None`. This
+will disable username related functionality in `allauth`.
+
+Similarly, you will need to set `ACCOUNT_USER_MODEL_EMAIL_FIELD` to
+`None`, or the proper field (if other than `email`).
+
+
+Creating and Populating User instances
+--------------------------------------
+
+The following adapter methods can be used to intervene in how User
+instances are created, and populated with data
+
+- `allauth.account.adapter.DefaultAccountAdapter`:
+
+  - `new_user(self, request)`: Instantiates a new, empty `User`.
+
+  - `save_user(self, request, user, form)`: Populates and saves the
+    `User` instance using information provided in the signup form.
+
+- `allauth.socialaccount.adapter.DefaultSocialAccountAdapter`:
+
+  - `new_user(self, request, sociallogin)`: Instantiates a new, empty
+    `User`.
+
+  - `save_user(self, request, sociallogin, form=None)`: Populates and
+    saves the `User` instance (and related social login data). The
+    signup form is not available in case of auto signup.
+
+  - `populate_user(self, request, sociallogin, data)`: Hook that can
+    be used to further populate the user instance
+    (`sociallogin.account.user`). Here, `data` is a dictionary of
+    common user properties (`first_name`, `last_name`, `email`,
+    `username`, `name`) that the provider already extracted for you.
+
+
+Invitations
+-----------
+
+Invitation handling is not supported, and most likely will not be any
+time soon. An invitation app could cover anything ranging from
+invitations of new users, to invitations of existing users to
+participate in restricted parts of the site. All in all, the scope of
+invitation handling is large enough to warrant being addressed in an
+app of its own.
+
+Still, everything is in place to easily hook up any third party
+invitation app. The account adapter
+(`allauth.account.adapter.DefaultAccountAdapter`) offers the following
+methods:
+
+- `is_open_for_signup(self, request)`. You can override this method to, for
+  example, inspect the session to check if an invitation was accepted.
+
+- `stash_verified_email(self, request, email)`. If an invitation was
+  accepted by following a link in a mail, then there is no need to
+  send e-mail verification mails after the signup is completed. Use
+  this method to record the fact that an e-mail address was verified.
+
+
+Sending E-mail
+--------------
+
+E-mails sent (e.g. in case of password forgotten, or e-mail
+confirmation) can be altered by providing your own
+templates. Templates are named as follows::
+
+    account/email/email_confirmation_subject.txt
+    account/email/email_confirmation_message.txt
+
+In case you want to include an HTML representation, add an HTML
+template as follows::
+
+    account/email/email_confirmation_message.html
+
+If this does not suit your needs, you can hook up your own custom
+mechanism by overriding the `send_mail` method of the account adapter
+(`allauth.account.adapter.DefaultAccountAdapter`).
+
+
+Custom Redirects
+----------------
+
+If redirecting to statically configurable URLs (as specified in your
+project settings) is not flexible enough, then you can override the
+following adapter methods:
+
+- `allauth.account.adapter.DefaultAccountAdapter`:
+
+  - `get_login_redirect_url(self, request)`
+
+  - `get_logout_redirect_url(self, request)`
+
+  - `get_email_confirmation_redirect_url(self, request)`
+
+- `allauth.socialaccount.adapter.DefaultSocialAccountAdapter`:
+
+  - `get_connect_redirect_url(self, request, socialaccount)`
+
+For example, redirecting to `/accounts/<username>/` can be implemented as
+follows::
+
+    # project/settings.py:
+    ACCOUNT_ADAPTER = 'project.users.adapter.MyAccountAdapter'
+
+    # project/users/adapter.py:
+    from django.conf import settings
+    from allauth.account.adapter import DefaultAccountAdapter
+
+    class MyAccountAdapter(DefaultAccountAdapter):
+
+        def get_login_redirect_url(self, request):
+            path = "/accounts/{username}/"
+            return path.format(username=request.user.username)
+
+Messages
+--------
+
+The Django messages framework (`django.contrib.messages`) is used if
+it is listed in `settings.INSTALLED_APPS`.  All messages (as in
+`django.contrib.messages`) are configurable by overriding their
+respective template. If you want to disable a message simply override
+the message template with a blank one.
+
+
+Frequently Asked Questions
+==========================
+
+Overall
+-------
+
+Why don't you implement support for ... ?
+*****************************************
+
+This app is just about authentication. Anything that is project
+specific, such as making choices on what to display in a profile page,
+or, what information is stored for a user (e.g. home address, or
+favorite color?), is beyond scope and therefore not offered.
+
+This information is nice and all, but... I need more!
+*****************************************************
+
+Here are a few third party resources to help you get started:
+
+- https://speakerdeck.com/tedtieken/signing-up-and-signing-in-users-in-django-with-django-allauth
+- http://stackoverflow.com/questions/tagged/django-allauth
+- http://www.sarahhagstrom.com/2013/09/the-missing-django-allauth-tutorial/
+
+
+Troubleshooting
+---------------
+
+The /accounts/ URL is giving me a 404
+*************************************
+
+There is no such URL. Try `/accounts/login/` instead.
+
+When I attempt to login I run into a 404 on /accounts/profile/
+**************************************************************
+
+When you end up here you have successfully logged in. However, you
+will need to implement a view for this URL yourself, as whatever is to
+be displayed here is project specific. You can also decide to redirect
+elsewhere:
+
+https://docs.djangoproject.com/en/dev/ref/settings/#login-redirect-url
+
+When I sign up I run into connectivity errors (connection refused et al)
+************************************************************************
+
+You probably have not got an e-mail (SMTP) server running on the
+machine you are developing on. Therefore, `allauth` is unable to send
+verification mails.
+
+You can work around this by adding the following line to
+``settings.py``:
+
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+This will avoid the need for an SMTP server as e-mails will be printed
+to the console. For more information, please refer to:
+
+https://docs.djangoproject.com/en/dev/ref/settings/#email-host
 
 Showcase
 ========
 
+- http://www.highlightcam.com/
+- http://www.q-dance.com
 - http://officecheese.com
 - http://www.mycareerstack.com
 - http://jug.gl
@@ -681,7 +1231,20 @@ Showcase
 - http://kwatsi.com
 - http://www.smartgoalapp.com
 - http://www.neekanee.com/
+- http://healthifyme.com/
+- http://www.burufly.com
+- http://eatwith.com/
+- http://en.globalquiz.org/
 - ...
 
 Please mail me (raymond.penners@intenct.nl) links to sites that have
 `django-allauth` up and running.
+
+
+Commercial Support
+==================
+
+This project is sponsored by IntenCT_. If you require assistance on
+your project(s), please contact us: info@intenct.nl.
+
+.. _IntenCT: http://www.intenct.info

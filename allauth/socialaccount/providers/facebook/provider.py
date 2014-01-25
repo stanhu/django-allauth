@@ -1,16 +1,22 @@
+import json
+
 from django.core.urlresolvers import reverse
 from django.core.exceptions import ImproperlyConfigured
 from django.template.loader import render_to_string
 from django.template import RequestContext
+from django.utils.html import mark_safe
 
 from allauth.utils import import_callable
+from allauth.account.models import EmailAddress
 from allauth.socialaccount import providers
-from allauth.socialaccount.providers.base import ProviderAccount
+from allauth.socialaccount.providers.base import (ProviderAccount,
+                                                  AuthProcess,
+                                                  AuthAction)
 from allauth.socialaccount.providers.oauth2.provider import OAuth2Provider
 from allauth.socialaccount.app_settings import QUERY_EMAIL
 from allauth.socialaccount.models import SocialApp
 
-from locale import get_default_locale_callable
+from .locale import get_default_locale_callable
 
 
 class FacebookAccount(ProviderAccount):
@@ -21,8 +27,8 @@ class FacebookAccount(ProviderAccount):
         uid = self.account.uid
         return 'http://graph.facebook.com/%s/picture?type=large' % uid
 
-    def __unicode__(self):
-        dflt = super(FacebookAccount, self).__unicode__()
+    def to_str(self):
+        dflt = super(FacebookAccount, self).to_str()
         return self.account.extra_data.get('name', dflt)
 
 
@@ -43,7 +49,10 @@ class FacebookProvider(OAuth2Provider):
         method = kwargs.get('method', self.get_method())
         if method == 'js_sdk':
             next = "'%s'" % (kwargs.get('next') or '')
-            ret = "javascript:FB_login(%s)" % next
+            process = "'%s'" % (kwargs.get('process') or AuthProcess.LOGIN)
+            action = "'%s'" % (kwargs.get('action') or AuthAction.AUTHENTICATE)
+            ret = "javascript:allauth.facebook.login(%s, %s, %s)" \
+                % (next, action, process)
         else:
             assert method == 'oauth2'
             ret = super(FacebookProvider, self).get_login_url(request,
@@ -70,8 +79,19 @@ class FacebookProvider(OAuth2Provider):
             scope.append('email')
         return scope
 
+    def get_auth_params(self, request, action):
+        ret = super(FacebookProvider, self).get_auth_params(request,
+                                                            action)
+        if action == AuthAction.REAUTHENTICATE:
+            ret['auth_type'] = 'reauthenticate'
+        return ret
+
+    def get_fb_login_options(self, request):
+        ret = self.get_auth_params(request, 'authenticate')
+        ret['scope'] = ','.join(self.get_scope())
+        return ret
+
     def media_js(self, request):
-        perms = ','.join(self.get_scope())
         locale = self.get_locale_for_request(request)
         try:
             app = self.get_app(request)
@@ -79,13 +99,35 @@ class FacebookProvider(OAuth2Provider):
             raise ImproperlyConfigured("No Facebook app configured: please"
                                        " add a SocialApp using the Django"
                                        " admin")
-        ctx =  {'facebook_app': app,
-                'facebook_channel_url':
-                request.build_absolute_uri(reverse('facebook_channel')),
-                'facebook_perms': perms,
-                'facebook_jssdk_locale': locale}
+        fb_login_options = self.get_fb_login_options(request)
+        ctx = {'facebook_app': app,
+               'facebook_channel_url':
+               request.build_absolute_uri(reverse('facebook_channel')),
+               'fb_login_options': mark_safe(json.dumps(fb_login_options)),
+               'facebook_jssdk_locale': locale}
         return render_to_string('facebook/fbconnect.html',
                                 ctx,
                                 RequestContext(request))
+
+    def extract_uid(self, data):
+        return data['id']
+
+    def extract_common_fields(self, data):
+        return dict(email=data.get('email'),
+                    username=data.get('username'),
+                    first_name=data.get('first_name'),
+                    last_name=data.get('last_name'))
+
+    def extract_email_addresses(self, data):
+        ret = []
+        email = data.get('email')
+        if email:
+            settings = self.get_settings()
+            verified_email = settings.get('VERIFIED_EMAIL')
+            verified = bool(data.get('verified') and verified_email)
+            ret.append(EmailAddress(email=email,
+                       verified=verified,
+                       primary=True))
+        return ret
 
 providers.registry.register(FacebookProvider)
